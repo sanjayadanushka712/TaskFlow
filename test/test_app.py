@@ -82,7 +82,7 @@ def test_Update_task_normal():
 def test_update_task_wrong_id():
     obj = Taskflow()
     with pytest.raises(ValueError):
-             obj.update_task("Learn Python", "") 
+             obj.update_task(1, "") 
 
 # test 12
 def test_update_task_null_title():

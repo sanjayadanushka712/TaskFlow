@@ -94,7 +94,7 @@ def task_delete_cli():
                     if task : 
                         print("Task delete successfully!")
                     else:
-                          print("Task Update Failed.")                 
+                          print("Task Delete Failed.")                 
                     break
                 except ValueError as e:
                     print(f"Error: {e}")

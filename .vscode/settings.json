@@ -1,3 +1,6 @@
 {
-  "cSpell.words": ["pycache", "pytest", "taskflow"]
+  "cSpell.words": ["pycache", "pytest", "sessionmaker", "taskflow"],
+  "code-runner.executorMap": {
+    "python": "\"$workspaceRoot/.venv/bin/python\" -u $fullFileName"
+  }
 }

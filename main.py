@@ -16,10 +16,12 @@ def task_create_cli():
                 task_title = input("Please enter the title: ")
 
                 try:
-                    obj.create_task(task_id,task_title)
-                    print("Task created successfully!")
-                    print("Current tasks:", obj.tasks)
-                    break
+                    task = obj.create_task(task_id,task_title)
+                    if task :
+                        print("Task created successfully!")
+                        display_task(task)
+                        
+                        break
                 except ValueError as e:
                     print(f"Error: {e}")
 
@@ -30,8 +32,8 @@ def task_find_cli():
 
         task = obj.find_task(task_id)
         if task: 
-            print("Task Found successfully!")
-            print(task)                   
+            print(" Task found successfully!")
+            display_task(task)               
         else:
             print("cannot Found Task")
 
@@ -58,8 +60,7 @@ def task_update_cli():
 
         task = obj.update_task(task_id,task_title)
         if task: 
-            print("Task updated successfully!")
-            print(task)
+            display_task(task)
         else:
             print("Task Update Failed.")  
              
@@ -74,46 +75,89 @@ def task_delete_cli():
             print("Task delete successfully!")
         else:
             print("Task Delete Failed.")  
-        
 
+def task_show_tasks_cli():
+    """Get and display all tasks in a clean table format.""" 
+    tasks = obj.get_all_task()
+    
+    if not tasks: 
+        print("\n--- No tasks found. ---")
+        return
+    display_tasks(tasks)
+
+
+def display_task(task):
+    status = "Done" if task.get('completed') else "Pending"
+
+    print("-" * 35)
+    print(f"{'Task ID:':<12} {task.get('id')}")
+    print(f"{'Title:':<12} {task.get('title')}")
+    print(f"{'Status:':<12} {status}")
+    print("-" * 35 + "\n")
+
+def display_tasks(tasks):
+    print(f"\n{'ID':<5} | {'Title':<20} | {'Status':<10}")
+    print("-" * 40)
+
+    for task in tasks:
+        status = "Done" if task['completed'] else "Pending"
+        print(f"{task['id']:<5} | {task['title']:<20} | {status:<10}")
+
+    print()
 
 def main():
        
-        print("===== TaskFlow =====")
-        task_menu = ["Create task","Find task","Complete task","Update task","Delete task","Exit"]
-        for index,item in enumerate(task_menu,start=1):
-                print(f"{index}. {item}")
+        task_menu = ["Create task","Show tasks","Find task","Complete task","Update task","Delete task","Exit"]
+
         while True:
+            print("===== TaskFlow =====")
+
+            for index,item in enumerate(task_menu,start=1):
+                print(f"{index}. {item}")
+            
             choice = input("choose: ")
 
+            try:
+                choice = int(choice)
+            except ValueError:
+                print("Invalid choice! Please enter a number.")
+                continue
+
+
             match choice:
-                case "1":
+                case 1:
                     print("Executing: Create task...")
                     task_create_cli()
-                    
-                case "2":
+                
+                case 2:
+                    print("Executing: Show tasks...")
+                    task_show_tasks_cli()
+                
+                case 3:
                     print("Executing: Find task...")
                     task_find_cli()
                     
-                case "3":
+                case 4:
                     print("Executing: Complete task...")
                     task_complete_cli()
                     
-                case "4":
+                case 5:
                     print("Executing: Update task...")
                     task_update_cli()
                     
-                case "5":
+                case 6:
                     print("Executing: Delete task...")
                     task_delete_cli()
                     
-                case "6":
+                case 7:
                     print("Goodbye!")
                     break  # Exit the while loop
                     
                 case _:  # The wildcard case (acts like 'default' or 'else')
-                    print("Invalid choice! Please enter a number between 1 and 6.")
+                    print("Invalid choice! Please enter a number between 1 and 7.")
 
 if __name__ == "__main__":
         obj = Taskflow()
         main()
+
+

@@ -18,7 +18,6 @@ class TaskResponse(BaseModel):
     completed: bool
 
 
-
 # check connection
 @app.get("/")
 def home():
@@ -26,7 +25,7 @@ def home():
 
 # create tasks
 @app.post(
-    "/create",
+    "/tasks",
     status_code=201,
     response_model=TaskResponse,
     responses={409: {"description": "Task ID already exists"}}
@@ -44,7 +43,8 @@ def create_task(data: TaskCreate):
 
 # find task
 @app.get(
-    "/find/{task_id}",
+    "/tasks/{task_id}",
+    response_model=TaskResponse,
     responses={404: {"description": "Task not found"}}
 )
 def find_task(task_id: int):
@@ -59,7 +59,10 @@ def find_task(task_id: int):
     return task
 
 # complete task
-@app.patch("/complete/{task_id}")
+@app.patch(
+    "/tasks/{task_id}/complete",
+    responses={404: {"description": "Task not found"}}
+)
 def complete_task(task_id: int):
     """Mark a task as completed."""
     success = taskflow.complete_task(task_id)
@@ -74,7 +77,9 @@ def complete_task(task_id: int):
 
 
 # delete task
-@app.delete("/delete/{task_id}")
+@app.delete("/tasks/{task_id}",
+            responses={404: {"description": "Task not found"}}
+)
 def delete_task(task_id: int):
     """Delete a task by its ID."""
     success = taskflow.delete_task(task_id)
@@ -88,7 +93,9 @@ def delete_task(task_id: int):
     return {"message": "Task deleted successfully"}
 
 # update tasks
-@app.put("/tasks/{task_id}")
+@app.put("/tasks/{task_id}",
+         responses={404: {"description": "Task not found"}}
+)
 def update_task(task_id: int, data: TaskUpdate):
     """Update a task title."""
     task = taskflow.update_task(task_id, data.title)
@@ -100,3 +107,10 @@ def update_task(task_id: int, data: TaskUpdate):
         )
 
     return task
+# get all tasks
+@app.get("/tasks",
+         response_model=list[TaskResponse]
+)
+def all_tasks():
+    """Get all tasks."""
+    return taskflow.get_all_task()

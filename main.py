@@ -1,3 +1,4 @@
+from database import SessionLocal 
 from app import Taskflow
 
 def get_task_id():
@@ -18,9 +19,9 @@ def task_create_cli():
                 try:
                     task = obj.create_task(task_id,task_title)
                     if task :
+                        obj.session.commit() 
                         print("Task created successfully!")
-                        display_task(task)
-                        
+                        display_task(task)   
                         break
                 except ValueError as e:
                     print(f"Error: {e}")
@@ -47,6 +48,7 @@ def task_complete_cli():
         task = obj.complete_task(task_id)
         if task:
             print("Task completed successfully!")
+            obj.session.commit()
         else:
             print("Task Completed Failed.")
 
@@ -61,6 +63,7 @@ def task_update_cli():
         task = obj.update_task(task_id,task_title)
         if task: 
             display_task(task)
+            obj.session.commit()
         else:
             print("Task Update Failed.")  
              
@@ -73,13 +76,13 @@ def task_delete_cli():
         task = obj.delete_task(task_id)
         if task: 
             print("Task delete successfully!")
+            obj.session.commit()
         else:
             print("Task Delete Failed.")  
 
 def task_show_tasks_cli():
     """Get and display all tasks in a clean table format.""" 
-    tasks = obj.get_all_task()
-    
+    tasks = obj.get_all_task()  
     if not tasks: 
         print("\n--- No tasks found. ---")
         return
@@ -157,7 +160,8 @@ def main():
                     print("Invalid choice! Please enter a number between 1 and 7.")
 
 if __name__ == "__main__":
-        obj = Taskflow()
+    with SessionLocal() as session:
+        obj = Taskflow(session)
         main()
 
 

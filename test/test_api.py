@@ -1,10 +1,25 @@
 from fastapi.testclient import TestClient
-from api import app,taskflow
+from api import app, get_session
 import pytest
+from database import engine, SessionLocal
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = SessionLocal(
+    bind=connection,
+    join_transaction_mode="create_savepoint"
+    )
+    def test_get_session():
+        yield session
+
+    app.dependency_overrides[get_session] = test_get_session
+    yield TestClient(app)
+    session.close()
+    transaction.rollback()
+    connection.close()
+    app.dependency_overrides.pop(get_session, None)
 
 # check connection
 def test_home(client):

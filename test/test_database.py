@@ -7,6 +7,23 @@ from models import Task
 from sqlalchemy.exc import IntegrityError
 
 
+@pytest.fixture
+def db_session():
+    connection = engine.connect()
+    transaction = connection.begin()
+
+    session = SessionLocal(
+        bind=connection,
+        join_transaction_mode="create_savepoint"
+    )
+
+    yield session
+
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
 # check database connection
 def test_database_connection():
     with engine.connect() as connection:
@@ -19,137 +36,114 @@ def test_tasks_table_exists():
 
     assert inspector.has_table("tasks")
 
-# read task from database
-# def test_read_task_from_database():
-#     with SessionLocal() as session:
-#         task = Task(
-#             id=200,
-#             title="Test PostgreSQL",
-#             completed=False
-#         )
 
-#         session.add(task)
-#         session.commit()
+def test_read_task_from_database(db_session):
 
-#         result = session.get(Task, 200)
+    task = Task(
+        id=201,
+        title="Test PostgreSQL",
+        completed=False
+    )
 
-#         assert result is not None
-#         assert result.id == 200
-#         assert result.title == "Test PostgreSQL"
-#         assert result.completed is False
+    db_session.add(task)
+    db_session.commit()
 
+    result = db_session.get(Task, 201)
 
-def test_read_task_from_database():
-    with SessionLocal() as session:
+    assert result is not None
+    assert result.id == 201
+    assert result.title == "Test PostgreSQL"
+    assert result.completed is False
+
+# update task from database
+def test_update_task_in_database(db_session):
         task = Task(
-            id=201,
-            title="Test PostgreSQL",
+            id=202,
+            title="Learn PostgreSQL",
             completed=False
         )
 
-        session.add(task)
-        session.commit()
+        db_session.add(task)
+        db_session.commit()
 
-        result = session.get(Task, 201)
+        task.title = "update task"
+        db_session.commit()
 
-        assert result is not None
-        assert result.id == 201
-        assert result.title == "Test PostgreSQL"
-        assert result.completed is False
+        result = db_session.get(Task, 202)
 
-# update task from database
-# def test_update_task_in_database():
-#     with SessionLocal() as session:
-#         task = Task(
-#             id=202,
-#             title="Learn PostgreSQL",
-#             completed=False
-#         )
+        assert result.title == "update task"  # type: ignore
 
-#         session.add(task)
-#         session.commit()
+def test_delete_task_from_database(db_session):
+        task = Task(
+            id=203,
+            title="delete Task",
+            completed=False
+        )
 
-#         task.title = "update task"
-#         session.commit()
+        db_session.add(task)
+        db_session.commit()
 
-#         result = session.get(Task, 202)
+        db_session.delete(task)
+        db_session.commit()
 
-#         assert result.title == "update task"  # type: ignore
+        result = db_session.get(Task, 203)
 
-# def test_delete_task_from_database():
-#     with SessionLocal() as session:
-#         task = Task(
-#             id=203,
-#             title="delete Task",
-#             completed=False
-#         )
-
-#         session.add(task)
-#         session.commit()
-
-#         session.delete(task)
-#         session.commit()
-
-#         result = session.get(Task, 203)
-
-#         assert result is None
+        assert result is None
 
 # complete task from database
-def test_complete_task_in_database():
-    with SessionLocal() as session:
+def test_complete_task_in_database(db_session):
         task = Task(
             id=204,
             title="complete Task",
             completed=False
         )
 
-        session.add(task)
-        session.commit()
+        db_session.add(task)
+        db_session.commit()
 
         task.completed = True
-        session.commit()
+        db_session.commit()
 
-        result = session.get(Task, 204)
+        result = db_session.get(Task, 204)
 
         assert result.completed  == True # type: ignore      
 
 # database duplicate id
-def test_duplicate_id_in_database():
-    with SessionLocal() as session:
-            task = Task(
-                id=205,
-                title="duplicate Task",
-                completed=False
-            )
-            session.add(task)
-            session.commit()
+def test_duplicate_id_in_database(db_session):
+        task = Task(
+            id=205,
+            title="duplicate Task",
+            completed=False
+        )
+        db_session.add(task)
+        db_session.commit()
 
-            with pytest.raises(IntegrityError):
-                task = Task(
-                                id=205,
-                                title="duplicate Task",
-                                completed=False
-                            )
-                session.add(task)
-                session.commit()
+        with pytest.raises(IntegrityError):
+            task = Task(
+                            id=205,
+                            title="duplicate Task",
+                            completed=False
+                        )
+            db_session.add(task)
+            db_session.commit()
+
 
 # database check multi tasks update
-def test_multi_tasks_update_one_not_exists():
-    with SessionLocal() as session:
-            task1 = Task(
-                id=206,
-                title="Multitask 1",
-                completed=False
-            )
+def test_multi_tasks_update_one_not_exists(db_session):
+        task1 = Task(
+            id=206,
+            title="Multitask 1",
+            completed=False
+        )
 
-            session.add(task1)
-            session.commit()
+        db_session.add(task1)
+        db_session.commit()
 
-            task_206 = session.get(Task, 206)
-            task_207 = session.get(Task, 207)
+        task_206 = db_session.get(Task, 206)
+        task_207 = db_session.get(Task, 207)
 
-            with pytest.raises(AttributeError):
+        with pytest.raises(AttributeError):
 
 
-                task_206.title = "Learn Python" # type: ignore
-                task_207.title = "Learn SQLAlchemy" # type: ignore
+            task_206.title = "Learn Python" # type: ignore
+            task_207.title = "Learn SQLAlchemy" # type: ignore

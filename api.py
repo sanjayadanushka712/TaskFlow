@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException,Depends
 from app import Taskflow
-from pydantic import BaseModel,Field
+from pydantic import BaseModel,Field,field_validator
 from database import SessionLocal
+from sqlalchemy.exc import IntegrityError
 
+    
 def get_session():
     session = SessionLocal()
     try:
@@ -12,12 +14,35 @@ def get_session():
 
 app = FastAPI()
 
+def validate_title(value: str) -> str:
+    cleaned_value = value.strip()
+
+    if not cleaned_value:
+        raise ValueError("Title cannot be empty")
+
+    return cleaned_value
+
 class TaskCreate(BaseModel):
     task_id: int = Field(gt=0)
     title: str = Field(min_length=1)
 
+
+    @field_validator("title")
+    @classmethod
+    def check_title(cls, value: str) -> str:
+        return validate_title(value)
+
+
 class TaskUpdate(BaseModel):
     title: str = Field(min_length=1)
+
+
+    @field_validator("title")
+    @classmethod
+    def check_title(cls, value: str) -> str:
+        return validate_title(value)
+
+
 
 class TaskResponse(BaseModel):
     id: int
@@ -49,6 +74,12 @@ def create_task(data: TaskCreate,session = Depends(get_session)):
         raise HTTPException(
             status_code=409,
             detail=str(error)
+        )
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Task ID conflicts with existing data"
         )
 
 # find task

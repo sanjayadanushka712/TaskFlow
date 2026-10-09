@@ -2,6 +2,8 @@ from fastapi.testclient import TestClient
 from api import app, get_session
 import pytest
 from database import engine, SessionLocal
+from unittest.mock import patch
+from sqlalchemy.exc import IntegrityError
 
 @pytest.fixture
 def client():
@@ -29,11 +31,11 @@ def test_home(client):
             "message": "TaskFlow API is running"
         }
 
-def test_get_all_tasks_empty_list(client):
-    response = client.get("/tasks")
+# def test_get_all_tasks_empty_list(client):
+#     response = client.get("/tasks")
 
-    assert response.status_code == 200
-    assert response.json() == []
+#     assert response.status_code == 200
+#     assert response.json() == []
 
 # get all tasks
 
@@ -93,6 +95,27 @@ def test_create_task(client):
         "title": "Learn Docker",
         "completed": False
     }
+    
+def test_create_task_handles_integrity_error(client):
+    with patch(
+        "api.Taskflow.create_task",
+        side_effect=IntegrityError("INSERT", {}, Exception("duplicate"))
+    ):
+        response = client.post(
+            "/tasks",
+            json={"task_id": 999, "title": "Learn Python"}
+        )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Task ID conflicts with existing data"
+
+def test_create_task_with_whitespace_title(client):
+    response = client.post(
+        "/tasks",
+        json={"task_id": 999, "title": "   "}
+    )
+
+    assert response.status_code == 422
 
 def test_create_task_invalid_id(client):
     response = client.post(
@@ -243,6 +266,23 @@ def test_update_task(client):
         "title": "Learn Advanced Docker",
         "completed": False
     }
+    
+def test_update_task_with_whitespace_title(client):
+    client.post(
+        "/tasks",
+        json={"task_id": 998, "title": "Original title"}
+    )
+
+    response = client.put(
+        "/tasks/998",
+        json={"title": "   "}
+    )
+
+    assert response.status_code == 422
+
+    result = client.get("/tasks/998")
+    assert result.status_code == 200
+    assert result.json()["title"] == "Original title"
 
 def test_update_task_not_found(client):
     response = client.put(

@@ -123,10 +123,29 @@ def create_task(
         )
     except IntegrityError:
         session.rollback()
+
+        if idempotency_key is not None:
+            record = session.get(IdempotencyRecord, idempotency_key)
+
+            if record is not None:
+                request_hash = create_request_hash(data)
+
+                if record.request_hash != request_hash:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Idempotency key reused with different request data"
+                    )
+
+                return JSONResponse(
+                    content=record.response_body,
+                    status_code=record.status_code
+                )
+
         raise HTTPException(
             status_code=409,
             detail="Task ID conflicts with existing data"
         )
+
 
 # find task
 @app.get(

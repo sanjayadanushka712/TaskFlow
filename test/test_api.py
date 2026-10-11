@@ -23,6 +23,7 @@ def client():
     connection.close()
     app.dependency_overrides.pop(get_session, None)
 
+
 # check connection
 def test_home(client):
     response = client.get("/")
@@ -30,15 +31,7 @@ def test_home(client):
     assert response.json() == {
             "message": "TaskFlow API is running"
         }
-
-# def test_get_all_tasks_empty_list(client):
-#     response = client.get("/tasks")
-
-#     assert response.status_code == 200
-#     assert response.json() == []
-
-# get all tasks
-
+    
 def test_get_all_tasks(client):
     client.post(
         "/tasks",
@@ -72,11 +65,13 @@ def test_get_all_tasks(client):
         }
     ]
 
+
 # check already exists
 def test_find_task_starts_empty(client):
     response = client.get("/tasks/1")
 
     assert response.status_code == 404
+
 
 # create task
 def test_create_task(client):
@@ -96,6 +91,94 @@ def test_create_task(client):
         "completed": False
     }
     
+def test_create_task_is_idempotent(client):
+    created = client.post(
+        "/tasks",
+        json={
+            "task_id": 1,
+            "title": "Learn Docker"
+        }
+    )
+    assert created.status_code == 201
+    second = client.post(
+        "/tasks",
+        json={
+            "task_id": 1,
+            "title": "Learn Docker"
+        }
+    )
+    assert second.status_code == 409
+    result = client.get("/tasks/1")
+    assert result.status_code == 200
+    assert result.json() == {
+            "id": 1,
+            "title": "Learn Docker",
+            "completed": False
+        }  
+
+def test_create_task_retry_returns_original_result(client):
+    payload = {
+        "task_id": 100,
+        "title": "Learn Docker"
+    }
+    headers = {
+        "Idempotency-Key": "task-create-001"
+    }
+
+    first = client.post(
+        "/tasks",
+        json=payload,
+        headers=headers
+    )
+
+    second = client.post(
+        "/tasks",
+        json=payload,
+        headers=headers
+    )
+    
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    assert first.json()["id"] == second.json()["id"]
+    assert first.json()["title"] == second.json()["title"]
+
+    result = client.get("/tasks/100")
+    assert result.status_code == 200
+    assert result.json()["title"] == "Learn Docker"
+
+def test_create_task_retry_with_different_payload_returns_409(client):
+    payload1 = {
+        "task_id": 100,
+        "title": "Learn Docker"
+    }
+    payload2 = {
+            "task_id": 100,
+            "title": "Learn Python"
+        }
+    headers = {
+        "Idempotency-Key": "task-create-001"
+    }
+
+    first = client.post(
+        "/tasks",
+        json=payload1,
+        headers=headers
+    )
+
+    second = client.post(
+        "/tasks",
+        json=payload2,
+        headers=headers
+    )
+    
+    assert first.status_code == 201
+    assert second.status_code == 409
+
+    result = client.get("/tasks/100")
+    assert result.status_code == 200
+    assert result.json()["title"] == "Learn Docker"
+
 def test_create_task_handles_integrity_error(client):
     with patch(
         "api.Taskflow.create_task",
@@ -116,6 +199,9 @@ def test_create_task_with_whitespace_title(client):
     )
 
     assert response.status_code == 422
+    assert 'detail' in response.json()
+    result = client.get("/tasks/999")
+    assert result.status_code == 404
 
 def test_create_task_invalid_id(client):
     response = client.post(
@@ -158,6 +244,7 @@ def test_create_task_duplicate_id(client):
 
     assert response.status_code == 409
 
+
 # find task
 def test_find_task(client):
     client.post(
@@ -190,6 +277,7 @@ def test_find_task_invalid_id(client):
 
     assert response.status_code == 422
 
+
 # patch complete
 
 def test_complete_task(client):
@@ -207,6 +295,25 @@ def test_complete_task(client):
     assert response.json() == {
         "message": "Task completed successfully"
     }
+     
+def test_complete_task_is_idempotent(client):
+    created =client.post(
+        "/tasks",
+        json={
+            "task_id": 5,
+            "title": "Learn Docker"
+        }
+    )
+    assert created.status_code == 201
+    first = client.patch("/tasks/5/complete")
+    second = client.patch("/tasks/5/complete")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    result = client.get("/tasks/5")
+    assert result.json()["completed"] is True
+    assert result.json()["title"] == "Learn Docker"
+    assert result.status_code == 200
 
 def test_complete_task_not_found(client):
     response = client.patch("/tasks/999/complete")
@@ -215,6 +322,7 @@ def test_complete_task_not_found(client):
     assert response.json() == {
         "detail": "Task not found"
     }
+
 
 # delete task
 
@@ -233,7 +341,25 @@ def test_delete_task(client):
     assert response.json() == {
         "message": "Task deleted successfully"
     }
-
+    
+def test_delete_task_is_idempotent(client):
+    created = client.post(
+        "/tasks",
+        json={
+            "task_id": 6,
+            "title": "Learn Kubernetes"
+        }
+    )
+    assert created.status_code == 201
+    first = client.delete("/tasks/6")
+    second = client.delete("/tasks/6")
+    
+    assert first.status_code == 200
+    assert second.status_code == 404
+    result = client.get("/tasks/6")
+    assert result.status_code == 404
+    assert result.json()["detail"] == "Task not found"
+    
 def test_delete_task_not_found(client):
     response = client.delete("/tasks/999")
 

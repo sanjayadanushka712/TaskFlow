@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException,Depends
+from fastapi import FastAPI, HTTPException,Depends,Header
 from app import Taskflow
 from pydantic import BaseModel,Field,field_validator
 from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
+import hashlib
+import json
+from models import IdempotencyRecord
+from fastapi.responses import JSONResponse
 
-    
+
 def get_session():
     session = SessionLocal()
     try:
@@ -21,7 +25,6 @@ def validate_title(value: str) -> str:
         raise ValueError("Title cannot be empty")
 
     return cleaned_value
-
 class TaskCreate(BaseModel):
     task_id: int = Field(gt=0)
     title: str = Field(min_length=1)
@@ -32,7 +35,16 @@ class TaskCreate(BaseModel):
     def check_title(cls, value: str) -> str:
         return validate_title(value)
 
+def create_request_hash(data: TaskCreate) -> str:
+    request_data = json.dumps(
+        data.model_dump(),
+        sort_keys=True,
+        separators=(",", ":")
+    )
 
+    return hashlib.sha256(
+        request_data.encode("utf-8")
+    ).hexdigest()
 class TaskUpdate(BaseModel):
     title: str = Field(min_length=1)
 
@@ -41,9 +53,6 @@ class TaskUpdate(BaseModel):
     @classmethod
     def check_title(cls, value: str) -> str:
         return validate_title(value)
-
-
-
 class TaskResponse(BaseModel):
     id: int
     title: str
@@ -62,13 +71,50 @@ def home():
     response_model=TaskResponse,
     responses={409: {"description": "Task ID already exists"}}
 )
+def create_task(
+    data: TaskCreate,
+    session=Depends(get_session),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key"
+    )
+    ):
+    if idempotency_key is not None:
+        record = session.get(IdempotencyRecord, idempotency_key)
+    else:
+        record = None
+    
+    if record is not None:
+        request_hash = create_request_hash(data)
 
-def create_task(data: TaskCreate,session = Depends(get_session)):
+        if record.request_hash != request_hash:
+            raise HTTPException(
+                status_code=409,
+                detail="Idempotency key reused with different request data"
+            )
+
+        return JSONResponse(
+            content=record.response_body,
+            status_code=record.status_code
+        )
+
     taskflow = Taskflow(session)
+    
     try:
         task = taskflow.create_task(data.task_id, data.title)
+
+        if idempotency_key is not None:
+            record = IdempotencyRecord(
+                key=idempotency_key,
+                request_hash=create_request_hash(data),
+                response_body=task,
+                status_code=201
+            )
+            session.add(record)
+
         session.commit()
         return task
+
     except ValueError as error:
         session.rollback()
         raise HTTPException(
@@ -117,7 +163,6 @@ def complete_task(task_id: int,session = Depends(get_session)):
     session.commit()
     return {"message": "Task completed successfully"}
 
-
 # delete task
 @app.delete("/tasks/{task_id}",
             responses={404: {"description": "Task not found"}}
@@ -151,6 +196,7 @@ def update_task(task_id: int, data: TaskUpdate,session = Depends(get_session)):
         )
     session.commit()
     return task
+
 # get all tasks
 @app.get("/tasks",
          response_model=list[TaskResponse]

@@ -94,3 +94,66 @@ The request conflicts with existing data, such as attempting to create a task wi
 
 Unprocessable Content
 The request reached FastAPI, but its data failed validation. For example, submitting a title containing only spaces. -->
+
+<!-- Lesson: What is a race condition?
+Imagine two requests arrive with the same idempotency key, task-create-001, almost simultaneously.
+Request A
+
+Request B
+
+Both look up the same key.
+Neither finds a record yet.
+
+Request A creates task and record.
+
+Request B also tries to create them.
+
+The conflict
+PostgreSQL's unique constraint prevents both requests from inserting the same idempotency key. But your application must handle that conflict and return the correct response instead of an unexpected server error. -->
+
+<!-- 
+First, distinguish these three concepts
+
+Concurrency
+Multiple tasks make progress during overlapping periods. Their execution may be interleaved rather than occurring strictly one after another.
+
+Parallelism
+Multiple tasks execute at the same instant, such as on separate CPU cores.
+
+Synchronization
+Mechanisms that coordinate competing tasks so shared state remains correct. -->
+
+
+
+<!-- Lesson 1 — 7 terminal tricks worth remembering
+
+1. Repeat a previous command
+!!
+
+Runs your last command again. Useful when you mistype something, but check what the command does before repeating it.
+
+1. Search command history
+Press Ctrl + R, then type part of a previous command, such as pytest. Press Enter to run the selected command.
+
+2. Autocomplete paths and commands
+Type pyte and press Tab. Your shell may complete it to pytest if the command is available. If there are multiple matches, press Tab again to see options.
+
+3. Jump to the previous directory
+cd -
+
+Switches back to the previous working directory.
+
+1. Go straight home
+cd ~
+
+Or simply run cd with no arguments.
+
+1. Show readable file sizes
+ls -lh
+
+The -h option displays sizes in units like KB and MB, rather than just bytes.
+
+1. Check your Git changes quickly
+git status --short
+
+In your TaskFlow repo, this shows modified and untracked files without a long explanation. -->

@@ -4,6 +4,11 @@ import pytest
 from database import engine, SessionLocal
 from unittest.mock import patch
 from sqlalchemy.exc import IntegrityError
+from concurrent.futures import ThreadPoolExecutor
+from sqlalchemy import select, func
+from models import IdempotencyRecord, Task
+import threading
+from app import Taskflow
 
 @pytest.fixture
 def client():
@@ -245,6 +250,80 @@ def test_create_task_duplicate_id(client):
     assert response.status_code == 409
 
 
+def test_concurrent_idempotent_task_creation():
+    task_id = 9001
+    key = "concurrent-test-9001"
+    payload = {
+    "task_id": task_id,
+    "title": "Test concurrent creation",
+    }
+
+    headers = {"Idempotency-Key": key}
+    # Remove only this test's old data, if a previous run left any.
+    with SessionLocal() as cleanup_session:
+        cleanup_session.query(IdempotencyRecord).filter_by(key=key).delete()
+        cleanup_session.query(Task).filter_by(id=task_id).delete()
+        cleanup_session.commit()
+
+    try:
+        # Force both requests to reach task creation before either proceeds.
+        barrier = threading.Barrier(2)
+        original_create_task = Taskflow.create_task
+
+        def synchronized_create_task(self, task_id, title):
+            barrier.wait(timeout=10)
+            return original_create_task(self, task_id, title)
+
+        with patch.object(
+            Taskflow,
+            "create_task",
+            synchronized_create_task,
+        ):
+            def send_request():
+                # Each request gets its own HTTP client and database session.
+                with TestClient(app) as client:
+                    return client.post(
+                        "/tasks",
+                        json=payload,
+                        headers=headers,
+                    )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future_a = executor.submit(send_request)
+                future_b = executor.submit(send_request)
+
+                response_a = future_a.result()
+                response_b = future_b.result()
+
+        # Both requests should return the same successful result.
+        assert response_a.status_code == 201
+        assert response_b.status_code == 201
+        assert response_a.json() == response_b.json()
+
+        # Verify persisted state using a fresh database session.
+        with SessionLocal() as verify_session:
+            task_count = (
+                verify_session.query(Task)
+                .filter_by(id=task_id)
+                .count()
+            )
+            record_count = (
+                verify_session.query(IdempotencyRecord)
+                .filter_by(key=key)
+                .count()
+            )
+
+        assert task_count == 1
+        assert record_count == 1
+
+    finally:
+        # Clean up even if an assertion or request fails.
+        with SessionLocal() as cleanup_session:
+            cleanup_session.query(IdempotencyRecord).filter_by(key=key).delete()
+            cleanup_session.query(Task).filter_by(id=task_id).delete()
+            cleanup_session.commit()
+
+
 # find task
 def test_find_task(client):
     client.post(
@@ -422,6 +501,7 @@ def test_update_task_not_found(client):
     assert response.json() == {
         "detail": "Task not found"
     }
+
 
 
 

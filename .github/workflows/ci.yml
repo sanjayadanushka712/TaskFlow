@@ -44,5 +44,11 @@ jobs:
       - name: Create database tables
         run: python create_tables.py
 
+      - name: Check code quality
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
       - name: Run tests
         run: python -m pytest

@@ -9,7 +9,8 @@
     "pytest",
     "sessionmaker",
     "taskflow",
-    "uvicorn"
+    "uvicorn",
+    "venv"
   ],
   "code-runner.executorMap": {
     "python": "\"$workspaceRoot/.venv/bin/python\" -u $fullFileName"

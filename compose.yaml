@@ -1,0 +1,6 @@
+services:
+  api:
+    build: .
+    network_mode: host
+    environment:
+      DATABASE_URL: "postgresql+psycopg://alexa@127.0.0.1:5432/taskflow"

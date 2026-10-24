@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 *.pyc
 .pytest_cache/
+.env/
+.env/.python-ven

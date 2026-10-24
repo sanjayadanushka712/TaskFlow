@@ -1,6 +1,8 @@
 {
   "cSpell.words": [
+    "dbname",
     "fastapi",
+    "healthcheck",
     "httpx",
     "isready",
     "psycopg",

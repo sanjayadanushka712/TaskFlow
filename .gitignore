@@ -1,6 +1,28 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyc
+*.egg-info/
+.venv/
+venv/
+
+# Test and lint caches
 .pytest_cache/
-.env/
-.env/.python-ven
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.directory
+omp.cache
+*.log
+
+# Operating system and editor files
+.DS_Store
+.idea/

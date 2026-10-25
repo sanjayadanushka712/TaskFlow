@@ -11,9 +11,7 @@ class Task(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    description: Mapped[str | None] = mapped_column(
-    String, nullable=True
-    )
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class IdempotencyRecord(Base):

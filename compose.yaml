@@ -1,38 +1,53 @@
-
 services:
-  api:
-    build: .
-    networks:
-      - taskflow-net
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL:
-        ${DATABASE_URL}
-    depends_on:
-      db:
-        condition: service_healthy
-
   db:
-    image: postgres:17
+    image: postgres:17-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    networks:
-      - taskflow-net
+      POSTGRES_USER: ${POSTGRES_USER:-taskflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskflow_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-taskflow}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - taskflow-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 10s
+    networks:
+      - taskflow-net
 
-networks:
-  taskflow-net:
-    external: true
+  api:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://taskflow:taskflow_dev@db:5432/taskflow}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - taskflow-net
 
 volumes:
   taskflow-data:
+
+networks:
+  taskflow-net:
+    driver: bridge

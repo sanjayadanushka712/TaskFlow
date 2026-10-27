@@ -4,6 +4,7 @@ import json
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app import Taskflow
@@ -17,6 +18,7 @@ def get_session():
         yield session
     finally:
         session.close()
+
 
 
 app = FastAPI()
@@ -61,6 +63,11 @@ class TaskResponse(BaseModel):
     title: str
     completed: bool
 
+# Add a  database health endpoint
+@app.get("/health/db")
+def database_health(session=Depends(get_session)):
+    session.execute(text("SELECT 1"))
+    return {"database": "healthy"}
 
 # check connection
 @app.get("/")
@@ -204,3 +211,4 @@ def all_tasks(session=Depends(get_session)):
     """Get all tasks."""
     taskflow = Taskflow(session)
     return taskflow.get_all_task()
+

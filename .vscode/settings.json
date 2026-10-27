@@ -4,6 +4,7 @@
     "fastapi",
     "healthcheck",
     "httpx",
+    "instrumentator",
     "isready",
     "psycopg",
     "pycache",
@@ -11,6 +12,8 @@
     "pytest",
     "sessionmaker",
     "taskflow",
+    "urllib",
+    "urlopen",
     "uvicorn",
     "venv"
   ],

@@ -4,3 +4,4 @@ psycopg[binary]==3.3.6
 pydantic==2.13.5
 uvicorn==0.54.0
 alembic==1.20.1
+prometheus-fastapi-instrumentator

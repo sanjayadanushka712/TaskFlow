@@ -1,12 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert -o k8s/
-    kompose.version: 1.38.0 (HEAD)
+  name: api
   labels:
     io.kompose.service: api
-  name: api
 spec:
   replicas: 1
   selector:
@@ -14,30 +11,38 @@ spec:
       io.kompose.service: api
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert -o k8s/
-        kompose.version: 1.38.0 (HEAD)
       labels:
         io.kompose.service: api
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:17-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h db -p 5432 -U taskflow -d taskflow; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
       containers:
-        - env:
+        - name: api
+          image: taskflow-api:latest
+          imagePullPolicy: IfNotPresent
+          env:
             - name: DATABASE_URL
               value: postgresql+psycopg://taskflow:taskflow_dev@db:5432/taskflow
-          image:
-            image: taskflow-api:latest
-            imagePullPolicy: IfNotPresent
           livenessProbe:
             exec:
               command:
                 - python
                 - -c
                 - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')
-            failureThreshold: 5
             initialDelaySeconds: 20
             periodSeconds: 10
             timeoutSeconds: 5
-          name: api
+            failureThreshold: 5
           ports:
             - containerPort: 8000
               protocol: TCP

@@ -20,5 +20,6 @@
   ],
   "code-runner.executorMap": {
     "python": "\"$workspaceRoot/.venv/bin/python\" -u $fullFileName"
-  }
+  },
+  "codeQL.githubDatabase.download": "never"
 }

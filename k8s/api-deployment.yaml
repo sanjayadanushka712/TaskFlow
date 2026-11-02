@@ -43,6 +43,15 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 5
+            
+          readinessProbe:
+            httpGet:
+              path: /health/db
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           ports:
             - containerPort: 8000
               protocol: TCP

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.db.serviceName }}
+  labels:
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.db.type }}
+  selector:
+    io.kompose.service: db
+    {{- include "taskflow-helm.selectorLabels" . | nindent 4 }}
+  ports:
+  {{- .Values.db.ports | toYaml | nindent 2 }}

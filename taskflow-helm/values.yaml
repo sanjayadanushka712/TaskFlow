@@ -1,0 +1,102 @@
+api:
+  serviceName: api
+  api:
+    env:
+      databaseUrl: postgresql+psycopg://taskflow:taskflow_dev@db:5432/taskflow
+    image:
+      repository: dsanjaya712/taskflow-api
+      tag: latest
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  nodeSelector: {}
+  ports:
+    - name: "8000"
+      port: 8000
+      targetPort: 8000
+  replicas: 1
+  tolerations: []
+  topologySpreadConstraints: []
+  type: ClusterIP
+  waitForDb:
+    image:
+      repository: postgres
+      tag: 17-alpine
+cm0:
+  prometheusYml: |-
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: "taskflow-api"
+        metrics_path: /metrics
+        static_configs:
+          - targets: ["api:8000"]
+db:
+  serviceName: db
+  db:
+    env:
+      postgresDb: taskflow
+      postgresPassword: taskflow_dev
+      postgresUser: taskflow
+    image:
+      repository: postgres
+      tag: 17-alpine
+  nodeSelector: {}
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  replicas: 1
+  strategy:
+    type: Recreate
+  tolerations: []
+  topologySpreadConstraints: []
+  type: ClusterIP
+grafana:
+  grafana:
+    image:
+      repository: grafana/grafana
+      tag: latest
+  nodeSelector: {}
+  ports:
+    - name: "3000"
+      port: 3000
+      targetPort: 3000
+  replicas: 1
+  strategy:
+    type: Recreate
+  tolerations: []
+  topologySpreadConstraints: []
+  type: ClusterIP
+kubernetesClusterDomain: cluster.local
+prometheus:
+  nodeSelector: {}
+  ports:
+    - name: "9090"
+      port: 9090
+      targetPort: 9090
+  prometheus:
+    args:
+      - --config.file=/etc/prometheus/prometheus.yml
+    image:
+      repository: prom/prometheus
+      tag: latest
+  replicas: 1
+  strategy:
+    type: Recreate
+  tolerations: []
+  topologySpreadConstraints: []
+  type: ClusterIP
+pvc:
+  data:
+    storageRequest: 1Gi
+  grafanaData:
+    storageRequest: 1Gi
+  taskflowData:
+    storageRequest: 1Gi

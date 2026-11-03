@@ -28,8 +28,8 @@ spec:
               echo "PostgreSQL is ready!"
       containers:
         - name: api
-          image: taskflow-api:latest
-          imagePullPolicy: IfNotPresent
+          image: dsanjaya712/taskflow-api:latest
+          imagePullPolicy: Always
           env:
             - name: DATABASE_URL
               value: postgresql+psycopg://taskflow:taskflow_dev@db:5432/taskflow

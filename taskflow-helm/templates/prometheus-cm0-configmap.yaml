@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-cm0
+  labels:
+    io.kompose.service: prometheus
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    use-subpath: "true"
+data:
+  prometheus.yml: {{ .Values.cm0.prometheusYml | toYaml | indent 1 }}

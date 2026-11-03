@@ -1,6 +1,6 @@
 # TaskFlow
 
-> An end-to-end DevOps learning project: a FastAPI task management API backed by PostgreSQL, containerized with Docker Compose, versioned with Alembic, and validated by a GitHub Actions CI pipeline.
+> An end-to-end DevOps learning project: a FastAPI task management API backed by PostgreSQL, containerized with Docker Compose, published to Docker Hub, deployed to Kubernetes with Helm, and validated by a GitHub Actions CI/CD pipeline.
 
 [![CI](https://github.com/sanjayadanushka712/TaskFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/sanjayadanushka712/TaskFlow/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -20,7 +20,8 @@ TaskFlow is a small but complete CRUD service built to demonstrate the full life
 - **Schema management:** Alembic migrations
 - **Runtime:** Docker + Docker Compose with health checks
 - **Quality:** Ruff linting/formatting and Pytest
-- **Automation:** GitHub Actions for migrations, tests, and container builds
+- **Automation:** GitHub Actions for migrations, tests, and Docker Hub image publishing
+- **Orchestration:** Kubernetes manifests and a Helm chart with Postgres, Prometheus, and Grafana
 - **Client:** A Python CLI (`main.py`) and a REST API (`api.py`)
 
 The API includes idempotent task creation through the `Idempotency-Key` header, which prevents duplicate work when clients retry requests.
@@ -36,7 +37,9 @@ The API includes idempotent task creation through the `Idempotency-Key` header, 
 - Alembic migration history for reproducible schemas
 - Docker Compose stack with a private network, named volume, and health checks
 - Non-root application container
-- Automated linting, formatting checks, migrations, tests, and Docker image builds in CI
+- Automated linting, formatting checks, migrations, tests, and Docker Hub image publishing in CI
+- Kubernetes deployment manifests with liveness/readiness probes and a database init container
+- Helm chart with configurable API image, replicas, resources, and monitoring stack
 - Interactive OpenAPI docs at `/docs` and `/redoc`
 - Simple terminal client for local use
 
@@ -59,7 +62,10 @@ flowchart LR
     Dev[Developer] -->|push / pull request / tag| CI[GitHub Actions]
     CI --> Lint[Ruff]
     CI --> Tests[Pytest against PostgreSQL]
-    CI --> Image[Docker image build]
+    CI -->|push image| Hub[(Docker Hub)]
+    Hub --> K8s[Kubernetes / Helm]
+    K8s --> API
+    K8s --> DB
 ```
 
 ### Request flow
@@ -86,7 +92,10 @@ flowchart LR
 | Tests | Pytest + HTTPX | Unit, API, and database tests |
 | Lint/format | Ruff | Code quality and formatting |
 | Containers | Docker + Compose | Reproducible local environment |
-| CI/CD | GitHub Actions | Automated verification and image builds |
+| Registry | Docker Hub | Published `dsanjaya712/taskflow-api` image |
+| Orchestration | Kubernetes + Helm | Cluster deployment and configuration |
+| Monitoring | Prometheus + Grafana | Metrics scraping and dashboards |
+| CI/CD | GitHub Actions | Automated verification and image publishing |
 
 ---
 
@@ -108,7 +117,16 @@ TaskFlow/
 │   ├── test_api.py            # API tests, including idempotency
 │   ├── test_app.py            # Service-layer tests
 │   └── test_database.py       # Database integration tests
-├── .github/workflows/ci.yml   # CI pipeline
+├── .github/workflows/ci.yml   # CI/CD pipeline (test, build, push)
+├── k8s/                       # Kubernetes manifests
+│   ├── api-deployment.yaml    # API Deployment (Docker Hub image)
+│   ├── db-deployment.yaml     # PostgreSQL Deployment
+│   └── ...                    # Services, PVCs, Prometheus, Grafana
+├── taskflow-helm/             # Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml            # Image repository/tag and app settings
+│   └── templates/
+├── monitoring/                # Prometheus and Grafana configuration
 ├── compose.yaml               # API + PostgreSQL stack
 ├── Dockerfile                 # Non-root application image
 ├── requirements.txt           # Runtime dependencies
@@ -413,8 +431,82 @@ The workflow lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
 | Format check | Runs `ruff format --check .` |
 | Tests | Runs the full Pytest suite |
 | Docker build | Builds the application image with Buildx and GitHub Actions cache |
+| Docker push | Pushes `dsanjaya712/taskflow-api` to Docker Hub |
 
-The Docker job only runs after the test job succeeds.
+The Docker job only runs after the test job succeeds. It pushes on `main` and on `v*` tags, and builds without pushing on pull requests.
+
+### Required GitHub secrets
+
+Add these repository secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | Docker Hub username (`dsanjaya712`) |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with read/write scope |
+
+Image tags produced by the workflow:
+
+- `latest` on pushes to `main`
+- `main` and `sha-<commit>` for traceability
+- `1.2.3` and `1.2` for `v1.2.3` tags
+
+---
+
+## Container image
+
+The API image is published to Docker Hub:
+
+```bash
+docker pull dsanjaya712/taskflow-api:latest
+docker run --rm -p 8000:8000 \
+  -e DATABASE_URL="postgresql+psycopg://taskflow:taskflow_dev@host.docker.internal:5432/taskflow" \
+  dsanjaya712/taskflow-api:latest
+```
+
+Build and push it manually:
+
+```bash
+docker login -u dsanjaya712
+docker build -t dsanjaya712/taskflow-api:latest .
+docker tag dsanjaya712/taskflow-api:latest dsanjaya712/taskflow-api:v1.0.0
+docker push dsanjaya712/taskflow-api:latest
+docker push dsanjaya712/taskflow-api:v1.0.0
+```
+
+PostgreSQL, Prometheus, and Grafana use their public upstream images; only the API image is built from this repository.
+
+---
+
+## Kubernetes deployment
+
+Both raw manifests and a Helm chart are provided. The API Deployment references the published Docker Hub image (`dsanjaya712/taskflow-api:latest`) with `imagePullPolicy: Always`.
+
+### Option 1: kubectl
+
+```bash
+kubectl apply -f k8s/
+kubectl get pods
+kubectl port-forward svc/api 8000:8000
+```
+
+The API pod waits for PostgreSQL through an init container and exposes `/health/db` as its readiness probe.
+
+### Option 2: Helm
+
+```bash
+helm upgrade --install taskflow ./taskflow-helm
+kubectl get pods
+```
+
+Override the image or replicas without editing files:
+
+```bash
+helm upgrade --install taskflow ./taskflow-helm \
+  --set api.api.image.repository=dsanjaya712/taskflow-api \
+  --set api.api.image.tag=latest \
+  --set api.api.imagePullPolicy=Always \
+  --set api.replicas=2
+```
 
 ---
 
@@ -450,7 +542,7 @@ git push origin main
 git push origin v1.0.0
 ```
 
-Tag pushes trigger the same CI pipeline, which validates the release commit and builds the container image.
+Tag pushes trigger the same CI pipeline, which validates the release commit, builds the image, and pushes it to Docker Hub as `dsanjaya712/taskflow-api:v1.0.0` (plus `1.0` and `latest` when on the default branch).
 
 ---
 

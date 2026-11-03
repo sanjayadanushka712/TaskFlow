@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-grafana
+  labels:
+    io.kompose.service: grafana
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    kompose.cmd: kompose convert -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+spec:
+  replicas: {{ .Values.grafana.replicas }}
+  strategy:
+    type: {{ .Values.grafana.strategy.type | quote }}
+  selector:
+    matchLabels:
+      io.kompose.service: grafana
+    {{- include "taskflow-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: grafana
+      {{- include "taskflow-helm.selectorLabels" . | nindent 8 }}
+      annotations:
+        kompose.cmd: kompose convert -o k8s/
+        kompose.version: 1.38.0 (HEAD)
+    spec:
+      containers:
+      - env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.grafana.grafana.image.repository }}:{{ .Values.grafana.grafana.image.tag
+          | default .Chart.AppVersion }}
+        name: grafana
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-data
+      nodeSelector: {{- toYaml .Values.grafana.nodeSelector | nindent 8 }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "taskflow-helm.serviceAccountName" . }}
+      tolerations: {{- toYaml .Values.grafana.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.grafana.topologySpreadConstraints |
+        nindent 8 }}
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: {{ include "taskflow-helm.fullname" . }}-grafana-data

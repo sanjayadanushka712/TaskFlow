@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-prometheus
+  labels:
+    io.kompose.service: prometheus
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    kompose.cmd: kompose convert -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+spec:
+  replicas: {{ .Values.prometheus.replicas }}
+  strategy:
+    type: {{ .Values.prometheus.strategy.type | quote }}
+  selector:
+    matchLabels:
+      io.kompose.service: prometheus
+    {{- include "taskflow-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: prometheus
+      {{- include "taskflow-helm.selectorLabels" . | nindent 8 }}
+      annotations:
+        kompose.cmd: kompose convert -o k8s/
+        kompose.version: 1.38.0 (HEAD)
+    spec:
+      containers:
+      - args: {{- toYaml .Values.prometheus.prometheus.args | nindent 8 }}
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.prometheus.prometheus.image.repository }}:{{ .Values.prometheus.prometheus.image.tag
+          | default .Chart.AppVersion }}
+        name: prometheus
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/prometheus/prometheus.yml
+          name: prometheus-cm0
+          readOnly: true
+          subPath: prometheus.yml
+        - mountPath: /prometheus
+          name: prometheus-data
+      nodeSelector: {{- toYaml .Values.prometheus.nodeSelector | nindent 8 }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "taskflow-helm.serviceAccountName" . }}
+      tolerations: {{- toYaml .Values.prometheus.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.prometheus.topologySpreadConstraints
+        | nindent 8 }}
+      volumes:
+      - configMap:
+          items:
+          - key: prometheus.yml
+            path: prometheus.yml
+          name: {{ include "taskflow-helm.fullname" . }}-cm0
+        name: prometheus-cm0
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: {{ include "taskflow-helm.fullname" . }}-data

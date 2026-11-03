@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-prometheus
+  labels:
+    io.kompose.service: prometheus
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    kompose.cmd: kompose convert -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+spec:
+  type: {{ .Values.prometheus.type }}
+  selector:
+    io.kompose.service: prometheus
+    {{- include "taskflow-helm.selectorLabels" . | nindent 4 }}
+  ports:
+  {{- .Values.prometheus.ports | toYaml | nindent 2 }}

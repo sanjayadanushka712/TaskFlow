@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-db
+  labels:
+    io.kompose.service: db
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    kompose.cmd: kompose convert -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+spec:
+  replicas: {{ .Values.db.replicas }}
+  strategy:
+    type: {{ .Values.db.strategy.type | quote }}
+  selector:
+    matchLabels:
+      io.kompose.service: db
+    {{- include "taskflow-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: db
+      {{- include "taskflow-helm.selectorLabels" . | nindent 8 }}
+      annotations:
+        kompose.cmd: kompose convert -o k8s/
+        kompose.version: 1.38.0 (HEAD)
+    spec:
+      containers:
+      - env:
+        - name: POSTGRES_DB
+          value: {{ quote .Values.db.db.env.postgresDb }}
+        - name: POSTGRES_PASSWORD
+          value: {{ quote .Values.db.db.env.postgresPassword }}
+        - name: POSTGRES_USER
+          value: {{ quote .Values.db.db.env.postgresUser }}
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.db.db.image.repository }}:{{ .Values.db.db.image.tag | default
+          .Chart.AppVersion }}
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          failureThreshold: 5
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: db
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: taskflow-data
+      nodeSelector: {{- toYaml .Values.db.nodeSelector | nindent 8 }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "taskflow-helm.serviceAccountName" . }}
+      tolerations: {{- toYaml .Values.db.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.db.topologySpreadConstraints | nindent
+        8 }}
+      volumes:
+      - name: taskflow-data
+        persistentVolumeClaim:
+          claimName: {{ include "taskflow-helm.fullname" . }}-taskflow-data

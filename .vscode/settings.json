@@ -7,6 +7,7 @@
     "instrumentator",
     "isready",
     "kompose",
+    "nindent",
     "psycopg",
     "pycache",
     "pydantic",

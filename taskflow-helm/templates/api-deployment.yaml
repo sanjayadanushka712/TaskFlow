@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taskflow-helm.fullname" . }}-api
+  labels:
+    io.kompose.service: api
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      io.kompose.service: api
+    {{- include "taskflow-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: api
+      {{- include "taskflow-helm.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - env:
+        - name: DATABASE_URL
+          value: {{ quote .Values.api.api.env.databaseUrl }}
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.api.api.image.repository }}:{{ .Values.api.api.image.tag | default
+          .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.api.imagePullPolicy }}
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')
+          failureThreshold: 5
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: api
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health/db
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources: {{- toYaml .Values.api.api.resources | nindent 10 }}
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h db -p 5432 -U taskflow -d taskflow; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.api.waitForDb.image.repository }}:{{ .Values.api.waitForDb.image.tag
+          | default .Chart.AppVersion }}
+        name: wait-for-db
+        resources: {}
+      nodeSelector: {{- toYaml .Values.api.nodeSelector | nindent 8 }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "taskflow-helm.serviceAccountName" . }}
+      tolerations: {{- toYaml .Values.api.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.api.topologySpreadConstraints | nindent
+        8 }}

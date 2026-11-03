@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.api.serviceName }}
+  labels:
+    io.kompose.service: api
+  {{- include "taskflow-helm.labels" . | nindent 4 }}
+  annotations:
+    kompose.cmd: kompose convert -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+spec:
+  type: {{ .Values.api.type }}
+  selector:
+    io.kompose.service: api
+    {{- include "taskflow-helm.selectorLabels" . | nindent 4 }}
+  ports:
+  {{- .Values.api.ports | toYaml | nindent 2 }}
